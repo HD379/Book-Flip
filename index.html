@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>10X City – Flipbook</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f3f1;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .book-wrapper {
+      width: min(1100px, 100vw - 40px);
+      height: min(700px, 100vh - 40px);
+      perspective: 2000px;
+    }
+
+    .book {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: #e6e1d8;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .page {
+      position: relative;
+      padding: 40px 48px 56px;
+      background: #fdfaf5;
+      overflow-y: auto;
+    }
+
+    .page h2 {
+      font-size: 1rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #b38a44;
+      margin-bottom: 12px;
+    }
+
+    .page h1 {
+      font-size: 1.5rem;
+      margin-bottom: 14px;
+    }
+
+    .page p {
+      line-height: 1.6;
+      margin-bottom: 10px;
+      font-size: 0.98rem;
+    }
+
+    .page-number {
+      position: absolute;
+      right: 24px;
+      bottom: 20px;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #b0a58f;
+    }
+
+    /* Turning animation (right page only) */
+    .right-page {
+      transform-origin: left center;
+      transition: transform 0.5s ease;
+    }
+
+    .turning-next {
+      transform: rotateY(-180deg);
+    }
+
+    .turning-prev {
+      transform: rotateY(180deg);
+    }
+
+    /* Navigation hints */
+    .hit-area {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 22%;
+      cursor: pointer;
+      z-index: 5;
+    }
+    .hit-area.left { left: 0; }
+    .hit-area.right { right: 0; }
+    .hint {
+      position: absolute;
+      bottom: 10px;
+      font-size: 0.75rem;
+      color: #c0b8a4;
+      pointer-events: none;
+    }
+    .hint.left { left: 14px; }
+    .hint.right { right: 14px; text-align: right; }
+  </style>
+</head>
+<body>
+<div class="book-wrapper">
+  <div class="book" id="book">
+    <div class="page left-page" id="page-left"></div>
+    <div class="page right-page" id="page-right"></div>
+
+    <div class="hit-area left" id="hit-left"></div>
+    <div class="hit-area right" id="hit-right"></div>
+    <div class="hint left">◀ drag / click</div>
+    <div class="hint right">drag / click ▶</div>
+  </div>
+</div>
+
+<script>
+  // Your book pages. Each item = one page of text.
+  const pages = [
+    {
+      title: "Opening",
+      subtitle: "10X City",
+      body: `Use me as a template. Replace this text with your own page content.`
+    },
+    {
+      title: "Chapter 1",
+      subtitle: "Principles",
+      body: `A 10X city begins with attention...`
+    },
+    {
+      title: "Closing",
+      subtitle: "One City as a Gift",
+      body: `Every city on Earth could copy the forms. Few can copy the attention...`
+    },
+    {
+      title: "End Notes",
+      subtitle: "",
+      body: `This is the end of the book.`
+    }
+  ];
+
+  let currentPageIndex = 0; // left page index (must be even)
+
+  const leftEl  = document.getElementById("page-left");
+  const rightEl = document.getElementById("page-right");
+
+  function renderPage(el, pageIndex) {
+    el.innerHTML = "";
+    if (pageIndex < 0 || pageIndex >= pages.length) return;
+
+    const p = pages[pageIndex];
+    const h2 = document.createElement("h2");
+    h2.textContent = p.subtitle || "";
+    const h1 = document.createElement("h1");
+    h1.textContent = p.title;
+    const body = document.createElement("p");
+    body.textContent = p.body;
+
+    const num = document.createElement("div");
+    num.className = "page-number";
+    num.textContent = pageIndex + 1;
+
+    if (p.subtitle) el.appendChild(h2);
+    el.appendChild(h1);
+    el.appendChild(body);
+    el.appendChild(num);
+  }
+
+  function renderSpread() {
+    if (currentPageIndex % 2 !== 0) currentPageIndex--;
+    renderPage(leftEl, currentPageIndex);
+    renderPage(rightEl, currentPageIndex + 1);
+  }
+
+  function nextSpread() {
+    if (currentPageIndex + 2 >= pages.length) return;
+    animateTurn("next", () => {
+      currentPageIndex += 2;
+      renderSpread();
+    });
+  }
+
+  function prevSpread() {
+    if (currentPageIndex - 2 < 0) return;
+    animateTurn("prev", () => {
+      currentPageIndex -= 2;
+      renderSpread();
+    });
+  }
+
+  function animateTurn(direction, cb) {
+    rightEl.classList.remove("turning-next", "turning-prev");
+    void rightEl.offsetWidth; // force reflow
+    rightEl.classList.add(direction === "next" ? "turning-next" : "turning-prev");
+    setTimeout(() => {
+      rightEl.classList.remove("turning-next", "turning-prev");
+      cb();
+    }, 500);
+  }
+
+  // Mouse / touch swipe
+  let startX = null;
+
+  function onPointerDown(e) {
+    startX = e.clientX || e.touches?.[0]?.clientX;
+  }
+  function onPointerUp(e) {
+    if (startX == null) return;
+    const endX = e.clientX || (e.changedTouches?.[0]?.clientX);
+    const dx = endX - startX;
+    if (dx < -50) nextSpread();    // swipe left to go forward
+    else if (dx > 50) prevSpread();// swipe right to go back
+    startX = null;
+  }
+
+  document.getElementById("hit-left").addEventListener("click", prevSpread);
+  document.getElementById("hit-right").addEventListener("click", nextSpread);
+
+  const book = document.getElementById("book");
+  ["mousedown","touchstart"].forEach(ev => book.addEventListener(ev, onPointerDown, {passive:true}));
+  ["mouseup","touchend"].forEach(ev => book.addEventListener(ev, onPointerUp, {passive:true}));
+
+  renderSpread();
+</script>
+</body>
+</html>
